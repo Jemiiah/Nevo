@@ -1,8 +1,8 @@
 #![cfg(test)]
 
 use soroban_sdk::{
-    testutils::{Address as _, Events, Ledger},
-    Address, BytesN, Env, String, TryIntoVal, Vec,
+    testutils::{Address as _, Ledger},
+    Address, BytesN, Env, String, Vec,
 };
 
 use crate::{
@@ -535,15 +535,15 @@ fn test_pause_unpause_full_cycle() {
     client.initialize(&admin);
 
     // Initial state
-    assert_eq!(client.is_paused(), false);
+    assert!(!client.is_paused());
 
     // Pause
     client.pause();
-    assert_eq!(client.is_paused(), true);
+    assert!(client.is_paused());
 
     // Unpause
     client.unpause();
-    assert_eq!(client.is_paused(), false);
+    assert!(!client.is_paused());
 }
 
 #[test]
@@ -567,7 +567,7 @@ fn test_admin_auth_for_pause() {
             },
         }])
         .pause();
-    assert_eq!(client.is_paused(), true);
+    assert!(client.is_paused());
 }
 
 #[test]
@@ -711,7 +711,7 @@ fn test_getters_work_when_paused() {
     // Getters should still work
     let campaign = client.get_campaign(&camp_id);
     assert_eq!(campaign.id, camp_id);
-    assert_eq!(client.is_paused(), true);
+    assert!(client.is_paused());
 }
 
 #[test]
@@ -781,7 +781,9 @@ fn test_contribute_and_event_emission() {
 
     // Register a mock token for testing
     let admin = Address::generate(&env);
-    let token_id = env.register_stellar_asset_contract(admin.clone());
+    let token_id = env
+        .register_stellar_asset_contract_v2(admin.clone())
+        .address();
     let token_client = soroban_sdk::token::Client::new(&env, &token_id);
     let token_admin_client = soroban_sdk::token::StellarAssetClient::new(&env, &token_id);
 

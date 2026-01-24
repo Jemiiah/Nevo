@@ -1,12 +1,12 @@
+#![allow(deprecated)]
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 
 use crate::base::{
     errors::CrowdfundingError,
     events,
     types::{
-        CampaignDetails, DisbursementRequest, MultiSigConfig, PoolConfig, PoolMetadata,
-        PoolMetrics, PoolState, StorageKey, MAX_DESCRIPTION_LENGTH, MAX_HASH_LENGTH,
-        MAX_URL_LENGTH,
+        CampaignDetails, MultiSigConfig, PoolConfig, PoolMetadata, PoolMetrics, PoolState,
+        StorageKey, MAX_DESCRIPTION_LENGTH, MAX_HASH_LENGTH, MAX_URL_LENGTH,
     },
 };
 use crate::interfaces::crowdfunding::CrowdfundingTrait;
@@ -15,6 +15,7 @@ use crate::interfaces::crowdfunding::CrowdfundingTrait;
 pub struct CrowdfundingContract;
 
 #[contractimpl]
+#[allow(clippy::too_many_arguments)]
 impl CrowdfundingTrait for CrowdfundingContract {
     fn create_campaign(
         env: Env,
@@ -29,7 +30,7 @@ impl CrowdfundingTrait for CrowdfundingContract {
         }
         creator.require_auth();
 
-        if title.len() == 0 {
+        if title.is_empty() {
             return Err(CrowdfundingError::InvalidTitle);
         }
 
@@ -69,6 +70,7 @@ impl CrowdfundingTrait for CrowdfundingContract {
             .ok_or(CrowdfundingError::CampaignNotFound)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn save_pool(
         env: Env,
         name: String,
@@ -85,7 +87,7 @@ impl CrowdfundingTrait for CrowdfundingContract {
         creator.require_auth();
 
         // Validate inputs
-        if name.len() == 0 {
+        if name.is_empty() {
             return Err(CrowdfundingError::InvalidPoolName);
         }
 
@@ -108,11 +110,11 @@ impl CrowdfundingTrait for CrowdfundingContract {
         // Validate multi-sig configuration if provided
         let multi_sig_config = match (required_signatures, signers) {
             (Some(req_sigs), Some(signer_list)) => {
-                let signer_count = signer_list.len() as u32;
+                let signer_count = signer_list.len();
                 if req_sigs == 0 || req_sigs > signer_count {
                     return Err(CrowdfundingError::InvalidMultiSigConfig);
                 }
-                if signer_list.len() == 0 {
+                if signer_list.is_empty() {
                     return Err(CrowdfundingError::InvalidSignerCount);
                 }
                 Some(MultiSigConfig {
@@ -339,7 +341,7 @@ impl CrowdfundingTrait for CrowdfundingContract {
         // For this task we assume the token interface is available via soroban_sdk::token
         use soroban_sdk::token;
         let token_client = token::Client::new(&env, &asset);
-        token_client.transfer(&contributor, &env.current_contract_address(), &amount);
+        token_client.transfer(&contributor, env.current_contract_address(), &amount);
 
         // Update metrics
         let metrics_key = StorageKey::PoolMetrics(pool_id);
