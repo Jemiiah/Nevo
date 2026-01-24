@@ -4,8 +4,9 @@ use crate::base::{
     errors::CrowdfundingError,
     events,
     types::{
-        CampaignDetails, DisbursementRequest, MultiSigConfig, PoolConfig, PoolMetrics, PoolState,
-        StorageKey,
+        CampaignDetails, DisbursementRequest, MultiSigConfig, PoolConfig, PoolMetadata,
+        PoolMetrics, PoolState, StorageKey, MAX_DESCRIPTION_LENGTH, MAX_HASH_LENGTH,
+        MAX_URL_LENGTH,
     },
 };
 use crate::interfaces::crowdfunding::CrowdfundingTrait;
@@ -71,7 +72,7 @@ impl CrowdfundingTrait for CrowdfundingContract {
     fn save_pool(
         env: Env,
         name: String,
-        description: String,
+        metadata: PoolMetadata,
         creator: Address,
         target_amount: i128,
         deadline: u64,
@@ -94,6 +95,14 @@ impl CrowdfundingTrait for CrowdfundingContract {
 
         if deadline <= env.ledger().timestamp() {
             return Err(CrowdfundingError::InvalidPoolDeadline);
+        }
+
+        // Validate metadata lengths
+        if metadata.description.len() > MAX_DESCRIPTION_LENGTH
+            || metadata.external_url.len() > MAX_URL_LENGTH
+            || metadata.image_hash.len() > MAX_HASH_LENGTH
+        {
+            return Err(CrowdfundingError::InvalidMetadata);
         }
 
         // Validate multi-sig configuration if provided
@@ -133,7 +142,6 @@ impl CrowdfundingTrait for CrowdfundingContract {
         // Create pool configuration (persistent view)
         let pool_config = PoolConfig {
             name: name.clone(),
-            description: description.clone(),
             target_amount,
             is_private: false,
             duration,
@@ -142,6 +150,10 @@ impl CrowdfundingTrait for CrowdfundingContract {
 
         // Store pool configuration
         env.storage().instance().set(&pool_key, &pool_config);
+
+        // Store pool metadata in persistent storage
+        let metadata_key = StorageKey::PoolMetadata(pool_id);
+        env.storage().persistent().set(&metadata_key, &metadata);
 
         // Store multi-sig config separately if provided
         if let Some(config) = multi_sig_config {
@@ -166,7 +178,7 @@ impl CrowdfundingTrait for CrowdfundingContract {
             &env,
             pool_id,
             name,
-            description,
+            metadata.description.clone(),
             creator,
             target_amount,
             deadline,
@@ -178,6 +190,27 @@ impl CrowdfundingTrait for CrowdfundingContract {
     fn get_pool(env: Env, pool_id: u64) -> Option<PoolConfig> {
         let pool_key = StorageKey::Pool(pool_id);
         env.storage().instance().get(&pool_key)
+    }
+
+    fn get_pool_metadata(env: Env, pool_id: u64) -> (String, String, String) {
+        let metadata_key = StorageKey::PoolMetadata(pool_id);
+        if let Some(metadata) = env
+            .storage()
+            .persistent()
+            .get::<StorageKey, PoolMetadata>(&metadata_key)
+        {
+            (
+                metadata.description,
+                metadata.external_url,
+                metadata.image_hash,
+            )
+        } else {
+            (
+                String::from_str(&env, ""),
+                String::from_str(&env, ""),
+                String::from_str(&env, ""),
+            )
+        }
     }
 
     fn update_pool_state(
